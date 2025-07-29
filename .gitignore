@@ -38,3 +38,12 @@ Thumbs.db
 
 # Streamlit
 .streamlit/
+
+# Application specific
+uploads/
+*.log
+.env
+
+# Backup files
+backup/
+old_*
