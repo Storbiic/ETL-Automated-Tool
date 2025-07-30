@@ -37,7 +37,7 @@ class ETLAPIClient:
             return {"success": False, "error": str(e)}
     
     def clean_data(self, file_id: str, master_sheet: str, target_sheet: str) -> Dict[str, Any]:
-        """Clean data"""
+        """Clean data (legacy method)"""
         try:
             data = {
                 "file_id": file_id,
@@ -49,6 +49,36 @@ class ETLAPIClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             st.error(f"Cleaning failed: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def clean_master_with_insights(self, file_id: str, master_sheet: str, target_sheet: str, target_column: str) -> Dict[str, Any]:
+        """Clean Master BOM with insights and X→D updates"""
+        try:
+            data = {
+                "file_id": file_id,
+                "master_sheet": master_sheet,
+                "target_sheet": target_sheet,
+                "target_column": target_column
+            }
+            response = self.session.post(f"{self.base_url}/clean-master-insights", json=data)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            st.error(f"Master BOM cleaning failed: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def clean_target_sheet(self, file_id: str, target_sheet: str) -> Dict[str, Any]:
+        """Clean target sheet only"""
+        try:
+            data = {
+                "file_id": file_id,
+                "target_sheet": target_sheet
+            }
+            response = self.session.post(f"{self.base_url}/clean-target", json=data)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            st.error(f"Target sheet cleaning failed: {str(e)}")
             return {"success": False, "error": str(e)}
     
     def suggest_column(self, input_name: str, available_columns: List[str]) -> Dict[str, Any]:

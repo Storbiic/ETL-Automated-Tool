@@ -12,7 +12,8 @@ from .models import (
     FileUploadResponse, SheetPreviewRequest, SheetPreviewResponse,
     CleaningRequest, CleaningResponse, LookupRequest, LookupResponse,
     ColumnSuggestionRequest, ColumnSuggestionResponse, MasterUpdateRequest,
-    MasterUpdateResponse, ErrorResponse
+    MasterUpdateResponse, MasterCleaningInsightsRequest, MasterCleaningInsightsResponse,
+    TargetCleaningRequest, TargetCleaningResponse, ErrorResponse
 )
 from .core.file_handler import file_manager
 from .core.cleaning import data_cleaner
@@ -85,7 +86,7 @@ async def preview_sheets(request: SheetPreviewRequest):
     """Get preview of specified sheets"""
     try:
         previews = file_manager.preview_sheets(request.file_id, request.sheet_names)
-        
+
         return SheetPreviewResponse(
             success=True,
             previews=previews
@@ -251,13 +252,74 @@ async def process_master_updates(request: MasterUpdateRequest):
             inserted_count=stats["inserted_count"],
             duplicates_count=stats["duplicates_count"],
             skipped_count=stats["skipped_count"],
-            duplicates=stats["duplicates"]
+            duplicates=stats["duplicates"],
+            updated_records=stats["updated_records"],
+            inserted_records=stats["inserted_records"]
         )
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Master BOM update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/clean-master-insights", response_model=MasterCleaningInsightsResponse)
+async def clean_master_with_insights(request: MasterCleaningInsightsRequest):
+    """Clean Master BOM with insights and X→D updates"""
+    try:
+        # Get original sheets
+        master_df = file_manager.get_sheet(request.file_id, request.master_sheet)
+        target_df = file_manager.get_sheet(request.file_id, request.target_sheet)
+
+        # Clean master with insights
+        master_cleaned, insights = data_cleaner.clean_master_with_insights(
+            master_df, target_df, request.target_column
+        )
+
+        # Store cleaned master
+        file_manager.update_sheet(request.file_id, request.master_sheet, master_cleaned)
+
+        return MasterCleaningInsightsResponse(
+            success=True,
+            message="Master BOM cleaning with insights completed successfully",
+            master_preview=master_cleaned[["YAZAKI PN", request.target_column]].head(10).to_dict('records'),
+            master_shape=list(master_cleaned.shape),
+            insights=insights
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Master BOM insights cleaning failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/clean-target", response_model=TargetCleaningResponse)
+async def clean_target_sheet(request: TargetCleaningRequest):
+    """Clean target sheet only"""
+    try:
+        # Get target sheet
+        target_df = file_manager.get_sheet(request.file_id, request.target_sheet)
+
+        # Clean target sheet
+        target_cleaned, target_stats = data_cleaner.clean_generic_sheet(target_df)
+        target_cleaned = data_cleaner.prepare_target_sheet(target_cleaned)
+
+        # Store cleaned target
+        file_manager.update_sheet(request.file_id, request.target_sheet, target_cleaned)
+
+        return TargetCleaningResponse(
+            success=True,
+            message="Target sheet cleaning completed successfully",
+            target_preview=target_cleaned.head(10).to_dict('records'),
+            target_shape=list(target_cleaned.shape)
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Target sheet cleaning failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

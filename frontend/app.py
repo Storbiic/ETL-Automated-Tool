@@ -125,14 +125,14 @@ with col_main:
         
         # Sheet selection
         col1, col2 = st.columns(2)
-        
+
         with col1:
             master_sheet = st.selectbox(
                 "Select Master BOM Sheet",
                 st.session_state.sheet_names,
                 key="master_sheet_select"
             )
-        
+
         with col2:
             target_options = [s for s in st.session_state.sheet_names if s != master_sheet]
             target_sheet = st.selectbox(
@@ -140,6 +140,21 @@ with col_main:
                 target_options,
                 key="target_sheet_select"
             )
+
+        # Target column selection for cleaning
+        if st.session_state.get('preview_data') and target_sheet in st.session_state.preview_data:
+            target_preview = st.session_state.preview_data[target_sheet]
+            if target_preview:
+                target_columns = list(pd.DataFrame(target_preview).columns)
+
+                st.subheader("🎯 Target Column Selection for Cleaning")
+                target_column = st.selectbox(
+                    "Select target column to analyze and clean:",
+                    target_columns,
+                    key="target_column_select",
+                    help="This column will be used for Master BOM insights and updates"
+                )
+                st.session_state.target_column = target_column
         
         # Preview button
         if st.button("👀 Preview Selected Sheets", type="primary"):
@@ -172,45 +187,99 @@ with col_main:
                 st.warning(f"No data in {sheet_name}")
     
     # Step 3: Data Cleaning
-    if st.session_state.current_step >= 2:
+    if st.session_state.current_step >= 2 and st.session_state.get('target_column'):
         st.markdown('<div class="step-header">🧹 Step 3: Data Cleaning</div>', unsafe_allow_html=True)
-        
-        if st.button("🧹 Clean Data", type="primary"):
-            with st.spinner("Cleaning data..."):
-                clean_result = api_client.clean_data(
-                    st.session_state.file_id,
-                    st.session_state.master_sheet,
-                    st.session_state.target_sheet
-                )
-                
-                if clean_result.get("success"):
-                    st.session_state.clean_result = clean_result
-                    st.session_state.current_step = 3
-                    add_log("Data cleaning completed")
-                    display_success_message(clean_result["message"])
-                    st.rerun()
-                else:
-                    display_error_message("Cleaning failed", clean_result.get("error"))
+
+        # Separate cleaning buttons
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("🏭 Master BOM Cleaning")
+            if st.button("🧹 Clean Master BOM", type="primary", key="clean_master"):
+                with st.spinner("Cleaning Master BOM..."):
+                    master_clean_result = api_client.clean_master_with_insights(
+                        st.session_state.file_id,
+                        st.session_state.master_sheet,
+                        st.session_state.target_sheet,
+                        st.session_state.target_column
+                    )
+
+                    if master_clean_result.get("success"):
+                        st.session_state.master_clean_result = master_clean_result
+                        add_log("Master BOM cleaning completed with insights")
+                        display_success_message(master_clean_result["message"])
+                        st.rerun()
+                    else:
+                        display_error_message("Master BOM cleaning failed", master_clean_result.get("error"))
+
+        with col2:
+            st.subheader("🎯 Target Sheet Cleaning")
+            if st.button("🧹 Clean Target Sheet", type="primary", key="clean_target"):
+                with st.spinner("Cleaning target sheet..."):
+                    target_clean_result = api_client.clean_target_sheet(
+                        st.session_state.file_id,
+                        st.session_state.target_sheet
+                    )
+
+                    if target_clean_result.get("success"):
+                        st.session_state.target_clean_result = target_clean_result
+                        add_log("Target sheet cleaning completed")
+                        display_success_message(target_clean_result["message"])
+                        st.rerun()
+                    else:
+                        display_error_message("Target sheet cleaning failed", target_clean_result.get("error"))
+
+        # Check if both cleanings are done to proceed
+        if st.session_state.get('master_clean_result') and st.session_state.get('target_clean_result'):
+            st.session_state.current_step = 3
 
     # Display cleaning results
-    if st.session_state.get('clean_result') and st.session_state.current_step >= 3:
+    if st.session_state.current_step >= 3:
         st.subheader("🧹 Cleaning Results")
 
         col1, col2 = st.columns(2)
 
-        with col1:
-            st.write(f"**Master ({st.session_state.master_sheet}) - YAZAKI PN only**")
-            st.write(f"Shape: {st.session_state.clean_result['master_shape']}")
-            if st.session_state.clean_result['master_preview']:
-                df = pd.DataFrame(st.session_state.clean_result['master_preview'])
-                st.dataframe(df, use_container_width=True)
+        # Master BOM cleaning results
+        if st.session_state.get('master_clean_result'):
+            with col1:
+                st.write(f"**Master BOM ({st.session_state.master_sheet})**")
+                result = st.session_state.master_clean_result
 
-        with col2:
-            st.write(f"**Target ({st.session_state.target_sheet})**")
-            st.write(f"Shape: {st.session_state.clean_result['target_shape']}")
-            if st.session_state.clean_result['target_preview']:
-                df = pd.DataFrame(st.session_state.clean_result['target_preview'])
-                st.dataframe(df, use_container_width=True)
+                # Display insights
+                if result.get('insights'):
+                    st.subheader("📊 Master BOM Insights")
+                    insights = result['insights']
+
+                    col1a, col1b, col1c, col1d = st.columns(4)
+                    with col1a:
+                        st.metric("Total Records", insights.get('total_records', 0))
+                    with col1b:
+                        st.metric("Status 'X'", insights.get('status_x_count', 0))
+                    with col1c:
+                        st.metric("Status 'D'", insights.get('status_d_count', 0))
+                    with col1d:
+                        st.metric("Status '0'", insights.get('status_0_count', 0))
+
+                    # Show updates made
+                    if insights.get('x_to_d_updates', 0) > 0:
+                        st.success(f"✅ Updated {insights['x_to_d_updates']} records from X → D (not found in target)")
+
+                # Display preview
+                st.write(f"Shape: {result.get('master_shape', [0, 0])}")
+                if result.get('master_preview'):
+                    df = pd.DataFrame(result['master_preview'])
+                    st.dataframe(df, use_container_width=True)
+
+        # Target sheet cleaning results
+        if st.session_state.get('target_clean_result'):
+            with col2:
+                st.write(f"**Target Sheet ({st.session_state.target_sheet})**")
+                result = st.session_state.target_clean_result
+
+                st.write(f"Shape: {result.get('target_shape', [0, 0])}")
+                if result.get('target_preview'):
+                    df = pd.DataFrame(result['target_preview'])
+                    st.dataframe(df, use_container_width=True)
 
     # Step 4: LOCKUP Configuration
     if st.session_state.current_step >= 3:
@@ -317,11 +386,11 @@ with col_main:
         with col1:
             st.metric("Status 'X' (No Update)", status_counts.get('X', 0), help="Records that will not be updated")
         with col2:
-            st.metric("Status 'D' (Update)", status_counts.get('D', 0), help="Records that will update existing entries")
+            st.metric("Status 'D' (Update D→X)", status_counts.get('D', 0), help="Records that will update existing entries, then change D to X")
         with col3:
-            st.metric("Status '0' (Check/Insert)", status_counts.get('0', 0), help="Records to check for duplicates or insert")
+            st.metric("Status '0' (Check/Insert)", status_counts.get('0', 0), help="Records to check for duplicates or insert with filtered column = X")
         with col4:
-            st.metric("Not Found (Insert)", status_counts.get('NOT_FOUND', 0), help="Records to insert as new entries")
+            st.metric("Not Found (Insert)", status_counts.get('NOT_FOUND', 0), help="Records to insert as new entries with filtered column = X")
 
         # Process updates button
         if st.button("🔄 Process Master BOM Updates", type="primary"):
@@ -358,6 +427,20 @@ with col_main:
             st.metric("Duplicates Found", update_result.get("duplicates_count", 0))
         with col4:
             st.metric("Skipped (X status)", update_result.get("skipped_count", 0))
+
+        # Show preview of updated records
+        if update_result.get("updated_records") and len(update_result["updated_records"]) > 0:
+            st.subheader("📝 Updated Records Preview")
+            st.write("Records that were updated (D → X):")
+            updated_df = pd.DataFrame(update_result["updated_records"])
+            display_dataframe_with_search(updated_df, "updated_records")
+
+        # Show preview of inserted records
+        if update_result.get("inserted_records") and len(update_result["inserted_records"]) > 0:
+            st.subheader("➕ Inserted Records Preview")
+            st.write("New records that were inserted into Master BOM:")
+            inserted_df = pd.DataFrame(update_result["inserted_records"])
+            display_dataframe_with_search(inserted_df, "inserted_records")
 
         # Show duplicates if any
         if update_result.get("duplicates") and len(update_result["duplicates"]) > 0:

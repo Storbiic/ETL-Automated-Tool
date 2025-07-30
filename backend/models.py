@@ -82,6 +82,37 @@ class MasterUpdateRequest(BaseModel):
     lookup_column: str
 
 
+class MasterCleaningInsightsRequest(BaseModel):
+    """Request model for Master BOM cleaning with insights"""
+    file_id: str
+    master_sheet: str
+    target_sheet: str
+    target_column: str
+
+
+class MasterCleaningInsightsResponse(BaseModel):
+    """Response model for Master BOM cleaning with insights"""
+    success: bool
+    message: str
+    master_preview: List[Dict[str, Any]]
+    master_shape: List[int]
+    insights: Dict[str, Any]
+
+
+class TargetCleaningRequest(BaseModel):
+    """Request model for target sheet cleaning"""
+    file_id: str
+    target_sheet: str
+
+
+class TargetCleaningResponse(BaseModel):
+    """Response model for target sheet cleaning"""
+    success: bool
+    message: str
+    target_preview: List[Dict[str, Any]]
+    target_shape: List[int]
+
+
 class MasterUpdateResponse(BaseModel):
     """Response model for Master BOM updates"""
     success: bool
@@ -91,6 +122,8 @@ class MasterUpdateResponse(BaseModel):
     duplicates_count: int
     skipped_count: int
     duplicates: List[Dict[str, Any]]
+    updated_records: List[Dict[str, Any]]
+    inserted_records: List[Dict[str, Any]]
 
 
 class ErrorResponse(BaseModel):
