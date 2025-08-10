@@ -82,6 +82,98 @@ class MasterUpdateRequest(BaseModel):
     lookup_column: str
 
 
+class SharePointConfigRequest(BaseModel):
+    """Request model for SharePoint configuration"""
+    site_url: str
+    username: str
+    password: str
+    folder_path: str
+
+
+class SharePointFileListResponse(BaseModel):
+    """Response model for SharePoint file listing"""
+    success: bool
+    message: str
+    files: List[Dict[str, Any]]
+
+
+class SharePointDownloadRequest(BaseModel):
+    """Request model for SharePoint file download"""
+    site_url: str
+    username: str
+    password: str
+    folder_path: str
+    file_name: str
+
+
+class SharePointDownloadResponse(BaseModel):
+    """Response model for SharePoint file download"""
+    success: bool
+    message: str
+    file_id: Optional[str]
+    file_name: str
+    backup_name: Optional[str]
+    original_url: str
+
+
+class SharePointUploadRequest(BaseModel):
+    """Request model for SharePoint file upload"""
+    site_url: str
+    username: str
+    password: str
+    folder_path: str
+    file_name: str
+    file_id: str
+    create_backup: bool = True
+
+
+class SharePointUploadResponse(BaseModel):
+    """Response model for SharePoint file upload"""
+    success: bool
+    message: str
+    uploaded_file: str
+    backup_created: Optional[str]
+    upload_timestamp: str
+
+
+class SharePointRollbackRequest(BaseModel):
+    """Request model for SharePoint rollback"""
+    site_url: str
+    username: str
+    password: str
+    folder_path: str
+    original_file: str
+    backup_file: str
+
+
+class SharePointRollbackResponse(BaseModel):
+    """Response model for SharePoint rollback"""
+    success: bool
+    message: str
+    restored_file: str
+    rollback_timestamp: str
+
+
+class ProcessingPreviewRequest(BaseModel):
+    """Request model for processing preview"""
+    file_id: str
+    master_sheet: str
+    target_sheet: str
+    lookup_column: str
+    key_column: str
+
+
+class ProcessingPreviewResponse(BaseModel):
+    """Response model for processing preview"""
+    success: bool
+    message: str
+    changes_summary: Dict[str, Any]
+    updated_records_preview: List[Dict[str, Any]]
+    inserted_records_preview: List[Dict[str, Any]]
+    duplicates_preview: List[Dict[str, Any]]
+    statistics: Dict[str, int]
+
+
 class MasterUpdateResponse(BaseModel):
     """Response model for Master BOM updates"""
     success: bool

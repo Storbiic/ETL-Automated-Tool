@@ -50,7 +50,10 @@ class DataCleaner:
         
         stats["final_shape"] = df.shape
         logger.info(f"Master cleaning completed: {stats}")
-        
+
+        # Fix data types for Arrow compatibility
+        df = DataCleaner.fix_arrow_compatibility(df)
+
         return df, stats
     
     @staticmethod
@@ -93,7 +96,10 @@ class DataCleaner:
         
         stats["final_shape"] = df.shape
         logger.info(f"Generic cleaning completed: {stats}")
-        
+
+        # Fix data types for Arrow compatibility
+        df = DataCleaner.fix_arrow_compatibility(df)
+
         return df, stats
     
     @staticmethod
@@ -112,6 +118,36 @@ class DataCleaner:
             cols.insert(0, cols.pop(cols.index("YAZAKI PN")))
             df = df[cols]
         
+        return df
+
+    @staticmethod
+    def fix_arrow_compatibility(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Fix DataFrame data types to prevent PyArrow serialization errors in Streamlit
+        """
+        df = df.copy()
+
+        for col in df.columns:
+            # Convert all object columns to string to avoid mixed type issues
+            if df[col].dtype == 'object':
+                # Handle mixed types by converting everything to string
+                df[col] = df[col].astype(str)
+                # Replace 'nan' strings with empty strings for cleaner display
+                df[col] = df[col].replace(['nan', 'None', 'NaN'], '')
+
+            # Handle numeric columns that might have mixed types
+            elif df[col].dtype in ['int64', 'float64']:
+                # Ensure numeric columns are properly typed
+                try:
+                    # Try to convert to numeric, coercing errors to NaN
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    # Fill NaN with 0 for display purposes
+                    df[col] = df[col].fillna(0)
+                except:
+                    # If conversion fails, convert to string
+                    df[col] = df[col].astype(str)
+
+        logger.info("DataFrame types fixed for Arrow compatibility")
         return df
 
 

@@ -3,7 +3,8 @@ Configuration settings for the ETL backend
 """
 import os
 from pathlib import Path
-from pydantic import BaseSettings
+from typing import List
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -25,7 +26,11 @@ class Settings(BaseSettings):
     allowed_extensions: list = [".csv", ".xls", ".xlsx"]
     
     # CORS Settings
-    cors_origins: list = ["http://localhost:8501", "http://127.0.0.1:8501"]
+    cors_origins: list = [
+        "http://localhost:8501", "http://127.0.0.1:8501",  # Streamlit
+        "http://localhost:3000", "http://127.0.0.1:3000",  # React frontend
+        "http://localhost:5001", "http://127.0.0.1:5001"   # Flask frontend (legacy)
+    ]
     
     # Logging Settings
     log_level: str = "INFO"

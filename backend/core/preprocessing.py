@@ -49,48 +49,81 @@ class DataProcessor:
     
     @staticmethod
     def add_activation_status(
-        master_df: pd.DataFrame, 
-        target_df: pd.DataFrame, 
-        key_col: str, 
+        master_df: pd.DataFrame,
+        target_df: pd.DataFrame,
+        key_col: str,
         lookup_col: str
     ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
-        Add activation status with detailed statistics
+        Add activation status with detailed statistics and logging
         Returns: (result_dataframe, lookup_stats)
         """
+        logger.info("🔍 Starting LOCKUP process...")
+        logger.info(f"📊 Input data: Master BOM ({len(master_df)} records), Target sheet ({len(target_df)} records)")
+        logger.info(f"🔑 Key column: '{key_col}', Lookup column: '{lookup_col}'")
+
         # Remove duplicates from master
         master_clean = master_df.drop_duplicates(subset=[key_col], keep='first')
-        
+        duplicates_removed = len(master_df) - len(master_clean)
+        if duplicates_removed > 0:
+            logger.info(f"🧹 Removed {duplicates_removed} duplicate records from Master BOM")
+
         # Prepare lookup dictionary
         lookup_series = master_clean[lookup_col]
         lookup_dict = pd.Series(lookup_series.values, index=master_clean[key_col]).to_dict()
-        
+
+        logger.info(f"📋 Created lookup dictionary with {len(lookup_dict)} unique mappings")
+
         stats = {
             "master_records": len(master_df),
             "master_unique_records": len(master_clean),
             "target_records": len(target_df),
             "lookup_dict_size": len(lookup_dict),
-            "mapping_results": {}
+            "duplicates_removed": duplicates_removed,
+            "mapping_results": {},
+            "detailed_log": []
         }
         
         df = target_df.copy()
-        
+
+        # Enhanced status mapping with detailed logging
         def get_status(key):
             if pd.isna(key):
+                stats["detailed_log"].append(f"⚠️ Missing key in target record")
                 return "MISSING_KEY"  # Key is missing/null in target
             elif key in lookup_dict:
                 val = lookup_dict[key]
-                return val if pd.notna(val) else "0"  # Found key, but value is null
+                if pd.notna(val):
+                    stats["detailed_log"].append(f"✅ Found '{key}' → '{val}'")
+                    return val
+                else:
+                    stats["detailed_log"].append(f"⚠️ Found '{key}' but value is null → '0'")
+                    return "0"  # Found key, but value is null
             else:
+                stats["detailed_log"].append(f"❌ Key '{key}' not found in Master BOM → 'NOT_FOUND'")
                 return "NOT_FOUND"  # Key not found in master
-        
+
+        logger.info("🔄 Starting LOCKUP mapping process...")
+
         # Apply custom mapping logic
         df.insert(1, 'ACTIVATION_STATUS', df[key_col].apply(get_status))
-        
+
+        logger.info("✅ LOCKUP mapping completed")
+
         # Calculate mapping statistics
         status_counts = df['ACTIVATION_STATUS'].value_counts().to_dict()
         stats["mapping_results"] = status_counts
         stats["total_processed"] = len(df)
+
+        # Log detailed results
+        logger.info("📊 LOCKUP Results Summary:")
+        for status, count in status_counts.items():
+            percentage = round((count / len(df)) * 100, 2)
+            logger.info(f"   {status}: {count} records ({percentage}%)")
+
+        # Limit detailed log to first 50 entries for performance
+        if len(stats["detailed_log"]) > 50:
+            stats["detailed_log"] = stats["detailed_log"][:50] + [f"... and {len(stats['detailed_log']) - 50} more entries"]
         
         # Calculate percentages
         total = len(df)

@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+/* Custom styles for ETL Tool with Theme Support */
+:root {
+  --transition-duration: 300ms;
+  --border-radius: 8px;
+  --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-heavy: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Dark mode shadows */
+.dark {
+  --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --shadow-heavy: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth transitions for all elements */
+* {
+  transition: background-color var(--transition-duration) ease,
+              border-color var(--transition-duration) ease,
+              color var(--transition-duration) ease,
+              box-shadow var(--transition-duration) ease;
+}
+
+/* Custom animations */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Preview tabs styling */
+.preview-tabs .ant-tabs-content-holder {
+  max-height: 500px;
+  overflow-y: auto;
+  border-radius: var(--border-radius);
+}
+
+/* Loading overlay improvements */
+.ant-spin-container {
+  transition: all var(--transition-duration) ease;
+}
+
+/* Custom scrollbar - Light mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e5eff2;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #98bfcb;
+  border-radius: 4px;
+  transition: background-color var(--transition-duration) ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7f9ec3;
+}
+
+/* Custom scrollbar - Dark mode */
+.dark ::-webkit-scrollbar-track {
+  background: #293e57;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #537cae;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #7f9ec3;
+}
+
+/* Theme-aware gradient backgrounds */
+.bg-gradient-custom-light {
+  background: linear-gradient(135deg, #f6fafb 0%, #e5eff2 50%, #d3e4e9 100%);
+}
+
+.bg-gradient-custom-dark {
+  background: linear-gradient(135deg, #151f2c 0%, #1e343b 50%, #293e57 100%);
+}
+
+/* Enhanced card styling */
+.custom-card {
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-light);
+  transition: all var(--transition-duration) ease;
+}
+
+.custom-card:hover {
+  box-shadow: var(--shadow-medium);
+  transform: translateY(-2px);
+}
+
+/* Button enhancements */
+.custom-button {
+  border-radius: var(--border-radius);
+  transition: all var(--transition-duration) ease;
+  font-weight: 500;
+}
+
+.custom-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-light);
+}
+
+/* Status indicators */
+.status-indicator {
+  position: relative;
+  display: inline-block;
+}
+
+.status-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.online::after {
+  background-color: #98bfcb;
+}
+
+.status-indicator.offline::after {
+  background-color: #d82423;
+}
+
+/* Typography improvements */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus styles */
+.focus-visible {
+  outline: 2px solid #7f9ec3;
+  outline-offset: 2px;
+}
+
+/* Selection styles */
+::selection {
+  background-color: #b2c4db;
+  color: #151f2c;
+}
+
+.dark ::selection {
+  background-color: #537cae;
+  color: #e5ebf3;
+}
