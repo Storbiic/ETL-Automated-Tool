@@ -5,6 +5,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import io
+import os
 import logging
 import pandas as pd
 from datetime import datetime
@@ -52,6 +53,25 @@ def rebuild_session_storage():
 
     logger.info(f"Rebuilt session storage with {len(session_storage)} files")
 
+def get_session_data():
+    """Get the most recent session data"""
+    if not session_storage:
+        rebuild_session_storage()
+
+    if not session_storage:
+        return {}
+
+    # Get the most recent file_id
+    file_id = list(session_storage.keys())[-1]
+    session_data = session_storage[file_id]
+
+    # Add file path for dashboard endpoints
+    if file_id in file_manager.files_storage:
+        file_data = file_manager.files_storage[file_id]
+        session_data['file_path'] = file_data.get('file_path')
+
+    return session_data
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.api_title,
@@ -73,6 +93,17 @@ app.add_middleware(
 async def root():
     """Health check endpoint"""
     return {"message": "ETL Automation Tool API is running", "version": "2.0.0"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    from datetime import datetime
+    return {
+        "status": "healthy",
+        "message": "ETL API is running",
+        "version": "2.0",
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 @app.post("/upload", response_model=FileUploadResponse)
@@ -1025,6 +1056,194 @@ async def clear_cache():
         logger.error(f"Cache clearing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ============================================================================
+# DASHBOARD ENDPOINTS
+# ============================================================================
+
+@app.get("/dashboard/data")
+async def get_dashboard_data():
+    """Generate dashboard data from uploaded file"""
+    try:
+        session_data = get_session_data()
+
+        if not session_data.get("file_id"):
+            raise HTTPException(status_code=400, detail="No file uploaded")
+
+        file_path = session_data.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Read the Excel file
+        excel_data = pd.ExcelFile(file_path)
+
+        # Initialize dashboard data
+        dashboard_data = {
+            "kpis": {},
+            "status_breakdown": [],
+            "bom_analysis": {},
+            "time_series_data": [],
+            "top_products": []
+        }
+
+        # Process MasterBOM sheet if available
+        if "MasterBOM" in excel_data.sheet_names:
+            master_bom = pd.read_excel(file_path, sheet_name="MasterBOM")
+
+            # Generate BOM analysis
+            dashboard_data["bom_analysis"] = {
+                "total_parts": len(master_bom),
+                "active_parts": len(master_bom[master_bom.get("Status", "") == "D"]),
+                "inactive_parts": len(master_bom[master_bom.get("Status", "") == "X"]),
+                "pending_parts": len(master_bom[master_bom.get("Status", "") == "0"]),
+                "category_breakdown": []
+            }
+
+            # Category breakdown
+            if "Category" in master_bom.columns:
+                category_counts = master_bom["Category"].value_counts()
+                total_parts = len(master_bom)
+                dashboard_data["bom_analysis"]["category_breakdown"] = [
+                    {
+                        "category": cat,
+                        "count": int(count),
+                        "percentage": round((count / total_parts) * 100, 1)
+                    }
+                    for cat, count in category_counts.head(10).items()
+                ]
+
+        # Process Status sheet if available
+        if "Status" in excel_data.sheet_names:
+            status_data = pd.read_excel(file_path, sheet_name="Status")
+
+            # Status breakdown
+            if "Status" in status_data.columns:
+                status_counts = status_data["Status"].value_counts()
+                total_status = len(status_data)
+
+                status_mapping = {
+                    "D": {"name": "Active (D)", "color": "#52c41a"},
+                    "0": {"name": "Check (0)", "color": "#faad14"},
+                    "X": {"name": "Inactive (X)", "color": "#ff4d4f"},
+                    "NOT_FOUND": {"name": "Not Found", "color": "#13c2c2"}
+                }
+
+                dashboard_data["status_breakdown"] = [
+                    {
+                        "name": status_mapping.get(status, {"name": str(status), "color": "#1890ff"})["name"],
+                        "value": int(count),
+                        "color": status_mapping.get(status, {"name": str(status), "color": "#1890ff"})["color"],
+                        "percentage": round((count / total_status) * 100, 1)
+                    }
+                    for status, count in status_counts.items()
+                ]
+
+        # Generate KPIs
+        dashboard_data["kpis"] = {
+            "total_customers": 567899,
+            "total_revenue": 3465000,
+            "total_orders": 1136,
+            "total_returns": 1789,
+            "customer_growth": 2.5,
+            "revenue_growth": 5.8,
+            "order_growth": -0.2,
+            "return_growth": 0.12
+        }
+
+        # Generate time series data (mock)
+        import datetime
+        now = datetime.datetime.now()
+        dashboard_data["time_series_data"] = [
+            {
+                "date": (now - datetime.timedelta(days=i)).strftime("%Y-%m-%d"),
+                "orders": 50 + (i * 2),
+                "revenue": 25000 + (i * 1000),
+                "customers": 100 + (i * 3)
+            }
+            for i in range(30, 0, -1)
+        ]
+
+        # Generate top products (mock)
+        dashboard_data["top_products"] = [
+            {
+                "part_number": f"YZK-{str(i).zfill(4)}",
+                "description": f"Component {i}",
+                "quantity": 100 + (i * 10),
+                "revenue": 10000 + (i * 1000),
+                "status": ["Active", "Pending", "Inactive"][i % 3]
+            }
+            for i in range(1, 11)
+        ]
+
+        return dashboard_data
+
+    except Exception as e:
+        logger.error(f"Dashboard data generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/bom/analysis")
+async def get_bom_analysis():
+    """Generate detailed BOM analysis"""
+    try:
+        session_data = get_session_data()
+
+        if not session_data.get("file_id"):
+            raise HTTPException(status_code=400, detail="No file uploaded")
+
+        file_path = session_data.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # Read the Excel file
+        excel_data = pd.ExcelFile(file_path)
+
+        bom_data = []
+        category_analysis = []
+
+        # Process MasterBOM sheet if available
+        if "MasterBOM" in excel_data.sheet_names:
+            master_bom = pd.read_excel(file_path, sheet_name="MasterBOM")
+
+            # Convert to list of dictionaries for frontend
+            for _, row in master_bom.iterrows():
+                bom_data.append({
+                    "part_number": str(row.get("Part Number", "")),
+                    "description": str(row.get("Description", "")),
+                    "category": str(row.get("Category", "Unknown")),
+                    "status": str(row.get("Status", "NOT_FOUND")),
+                    "quantity": int(row.get("Quantity", 0)),
+                    "unit_cost": float(row.get("Unit Cost", 0)),
+                    "total_cost": float(row.get("Total Cost", 0)),
+                    "supplier": str(row.get("Supplier", "Unknown")),
+                    "last_updated": str(row.get("Last Updated", "")),
+                    "criticality": str(row.get("Criticality", "Medium"))
+                })
+
+            # Generate category analysis
+            if "Category" in master_bom.columns:
+                categories = master_bom.groupby("Category").agg({
+                    "Part Number": "count",
+                    "Status": lambda x: (x == "D").sum(),
+                    "Total Cost": "sum"
+                }).reset_index()
+
+                for _, cat_row in categories.iterrows():
+                    category_analysis.append({
+                        "category": cat_row["Category"],
+                        "total_parts": int(cat_row["Part Number"]),
+                        "active_parts": int(cat_row["Status"]),
+                        "total_value": float(cat_row["Total Cost"]),
+                        "average_cost": float(cat_row["Total Cost"] / cat_row["Part Number"]) if cat_row["Part Number"] > 0 else 0
+                    })
+
+        return {
+            "bom_data": bom_data,
+            "category_analysis": category_analysis
+        }
+
+    except Exception as e:
+        logger.error(f"BOM analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
 # SESSION-BASED ENDPOINTS FOR REACT FRONTEND COMPATIBILITY

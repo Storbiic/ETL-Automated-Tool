@@ -32,6 +32,8 @@ import { StepNavigation } from './StepNavigation';
 import { APIDebugger } from './APIDebugger';
 import { ColumnInsights } from './ColumnInsights';
 import { LookupInsights } from './LookupInsights';
+import { Dashboard } from './Dashboard';
+import { BOMAnalysis } from './BOMAnalysis';
 
 const { Header, Content, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -84,6 +86,7 @@ export const ETLDashboard: React.FC = () => {
   const { isHealthy, isChecking, checkHealth, retryCount } = useAPIHealth();
   const { isDark } = useTheme();
   const [showDebugger, setShowDebugger] = React.useState(false);
+  const [activeSection, setActiveSection] = React.useState<'process' | 'dashboard' | 'bom'>('process');
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -105,6 +108,19 @@ export const ETLDashboard: React.FC = () => {
         return <MasterUpdates />;
       default:
         return <FileUpload />;
+    }
+  };
+
+  const renderMainContent = () => {
+    switch (activeSection) {
+      case 'process':
+        return renderStepContent();
+      case 'dashboard':
+        return <Dashboard />;
+      case 'bom':
+        return <BOMAnalysis />;
+      default:
+        return renderStepContent();
     }
   };
 
@@ -136,6 +152,46 @@ export const ETLDashboard: React.FC = () => {
               <Text type="secondary" className="text-sm">
                 v2.0 - React + Next.js Edition
               </Text>
+            </div>
+
+            {/* Navigation Menu */}
+            <div className="flex items-center space-x-2 ml-8">
+              <Button
+                type={activeSection === 'process' ? 'primary' : 'default'}
+                onClick={() => setActiveSection('process')}
+                size="small"
+                className={`${
+                  activeSection === 'process'
+                    ? ''
+                    : isDark ? 'bg-vista-50 border-vista-200 text-vista-700' : 'bg-azure-50 border-azure-200 text-azure-700'
+                }`}
+              >
+                📁 Process File
+              </Button>
+              <Button
+                type={activeSection === 'dashboard' ? 'primary' : 'default'}
+                onClick={() => setActiveSection('dashboard')}
+                size="small"
+                className={`${
+                  activeSection === 'dashboard'
+                    ? ''
+                    : isDark ? 'bg-vista-50 border-vista-200 text-vista-700' : 'bg-azure-50 border-azure-200 text-azure-700'
+                }`}
+              >
+                📊 Dashboard
+              </Button>
+              <Button
+                type={activeSection === 'bom' ? 'primary' : 'default'}
+                onClick={() => setActiveSection('bom')}
+                size="small"
+                className={`${
+                  activeSection === 'bom'
+                    ? ''
+                    : isDark ? 'bg-vista-50 border-vista-200 text-vista-700' : 'bg-azure-50 border-azure-200 text-azure-700'
+                }`}
+              >
+                🔧 BOM Analysis
+              </Button>
             </div>
           </div>
 
@@ -204,15 +260,16 @@ export const ETLDashboard: React.FC = () => {
       </Header>
 
       <Layout>
-        {/* Sidebar */}
-        <Sider
-          width={320}
-          className={`shadow-xl transition-all duration-300 ${
-            isDark ? 'bg-vista-100' : 'bg-white'
-          }`}
-          breakpoint="lg"
-          collapsedWidth="0"
-        >
+        {/* Conditional Sidebar - Only show for Process File section */}
+        {activeSection === 'process' && (
+          <Sider
+            width={320}
+            className={`shadow-xl transition-all duration-300 ${
+              isDark ? 'bg-vista-100' : 'bg-white'
+            }`}
+            breakpoint="lg"
+            collapsedWidth="0"
+          >
           <div className="p-6">
             {/* Progress Steps */}
             <div className="mb-6">
@@ -284,6 +341,7 @@ export const ETLDashboard: React.FC = () => {
             </div>
           </div>
         </Sider>
+        )}
 
         {/* Main Content */}
         <Layout className="p-6">
@@ -351,7 +409,7 @@ export const ETLDashboard: React.FC = () => {
                 <div className="flex flex-col h-full">
                   {/* Main Content */}
                   <div className="flex-1">
-                    {renderStepContent()}
+                    {renderMainContent()}
                   </div>
 
                   {/* Step Navigation */}
